@@ -153,3 +153,58 @@ spec:
         image: ojbfive/yelb-appserver:0.5
         ports:
         - containerPort: 4567
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tunnel-sidecar-pv-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ziti-tunnel-sidecar-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ziti-tunnel-sidecar-demo
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: ziti-tunnel-sidecar-demo
+    spec:
+      containers:
+      - image: netfoundry/ziti-tunnel:latest
+        name: ziti-tunnel
+        env:
+        - name: NF_REG_NAME
+          value: tunnel-sidecar
+        volumeMounts:
+        - name: tunnel-sidecar-jwt
+          mountPath: "/var/run/secrets/kubernetes.io/enrollment-token"
+          readOnly: true
+        - name: ziti-tunnel-persistent-storage
+          mountPath: /netfoundry
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+      dnsPolicy: "None"
+      dnsConfig:
+        nameservers:
+          - 127.0.0.1
+          - 8.8.8.8
+      restartPolicy: Always
+      volumes:
+      - name: ziti-tunnel-persistent-storage
+        persistentVolumeClaim:
+          claimName: tunnel-sidecar-pv-claim
+      - name: tunnel-sidecar-jwt
+        secret:
+          secretName: tunnel-sidecar.jwt  
